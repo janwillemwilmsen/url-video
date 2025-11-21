@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>User Profile</h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/users/list">User List</a>
+                <a href="/auth/logout">Logout</a>
+            </nav>
+        </header>
+        <main>
+            <div class="profile-card">
+                <h2>
+                    <%= user.displayName %>
+                </h2>
+                <p><strong>Email:</strong>
+                    <%= user.email %>
+                </p>
+                <p><strong>Google ID:</strong>
+                    <%= user.googleId %>
+                </p>
+                <p><strong>Joined:</strong>
+                    <%= new Date(user.createdAt).toLocaleDateString() %>
+                </p>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
