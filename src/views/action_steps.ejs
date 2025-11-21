@@ -1,0 +1,273 @@
+<div class="action-workspace">
+    <div class="steps-nav">
+        <button class="step-btn active" data-step="1">1. Scrape</button>
+        <button class="step-btn" data-step="2">2. Select</button>
+        <button class="step-btn" data-step="3">3. Convert</button>
+        <button class="step-btn" data-step="4">4. Edit</button>
+        <button class="step-btn" data-step="5">5. Join</button>
+    </div>
+
+    <div class="step-content" id="step-1">
+        <div class="glass-panel center-content">
+            <h2>Source URL</h2>
+            <p class="url-display">
+                <%= action.url %>
+            </p>
+            <div class="status-indicator">Status: <span id="action-status">
+                    <%= action.status %>
+                </span></div>
+
+            <% if (action.status==='created' ) { %>
+                <button id="start-scrape-btn" class="btn btn-primary btn-lg">Start Scraping Images</button>
+                <% } else if (action.status==='scraping' ) { %>
+                    <div class="loader">Scraping in progress...</div>
+                    <% } else { %>
+                        <p>Scraping completed. Proceed to Step 2.</p>
+                        <button class="btn btn-primary" onclick="switchStep(2)">Next Step</button>
+                        <% } %>
+        </div>
+    </div>
+
+    <div class="step-content hidden" id="step-2">
+        <div class="toolbar">
+            <h3>Select Images to Convert</h3>
+            <span id="selection-count">0 selected</span>
+        </div>
+        <div class="image-grid" id="image-grid">
+            <!-- Populated via JS -->
+        </div>
+    </div>
+
+    <div class="step-content hidden" id="step-3">
+        <div class="glass-panel center-content">
+            <h2>Ready to Convert?</h2>
+            <p>Selected images will be sent to VEO 3 for video generation.</p>
+            <button id="start-convert-btn" class="btn btn-primary btn-lg">Start Conversion</button>
+        </div>
+    </div>
+
+    <div class="step-content hidden" id="step-4">
+        <h2>Generated Videos</h2>
+        <div class="video-list" id="video-list"></div>
+    </div>
+
+    <div class="step-content hidden" id="step-5">
+        <div class="glass-panel center-content">
+            <h2>Finalize Video</h2>
+            <button id="join-videos-btn" class="btn btn-primary btn-lg">Join All Videos</button>
+            <div id="final-video-container" class="hidden margin-top">
+                <video controls width="100%" id="final-video-player"></video>
+                <a id="download-link" class="btn btn-secondary margin-top" download>Download Video</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const actionId = '<%= action.id %>';
+    let currentStatus = '<%= action.status %>';
+
+    // Simple Tab Switching
+    function switchStep(step) {
+        document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`step-${step}`).classList.remove('hidden');
+
+        document.querySelectorAll('.step-btn').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.step-btn[data-step="${step}"]`).classList.add('active');
+
+        if (step === 2) loadImages();
+        if (step === 4) loadVideos();
+    }
+
+    document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchStep(parseInt(btn.dataset.step)));
+    });
+
+    // Step 1: Scrape
+    const scrapeBtn = document.getElementById('start-scrape-btn');
+    if (scrapeBtn) {
+        scrapeBtn.addEventListener('click', async () => {
+            scrapeBtn.disabled = true;
+            scrapeBtn.innerText = 'Starting...';
+            const res = await fetch(`/actions/${actionId}/scrape`, { method: 'POST' });
+            if (res.ok) {
+                location.reload();
+            }
+        });
+    }
+
+    // Step 2: Load Images
+    async function loadImages() {
+        const res = await fetch(`/actions/${actionId}/items`);
+        const items = await res.json();
+        const grid = document.getElementById('image-grid');
+        grid.innerHTML = '';
+
+        items.filter(i => i.type === 'image').forEach(item => {
+            const div = document.createElement('div');
+            div.className = `image-card ${item.selected ? 'selected' : ''}`;
+            div.onclick = () => toggleSelection(item.id, div);
+            div.innerHTML = `<img src="/storage/actions/${actionId}/raw/${item.path.split(/[\\/]/).pop()}" loading="lazy">`;
+            grid.appendChild(div);
+        });
+        updateSelectionCount();
+    }
+
+    async function toggleSelection(itemId, element) {
+        const res = await fetch(`/actions/${actionId}/items/${itemId}/toggle`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            element.classList.toggle('selected');
+            updateSelectionCount();
+        }
+    }
+
+    function updateSelectionCount() {
+        const count = document.querySelectorAll('.image-card.selected').length;
+        document.getElementById('selection-count').innerText = `${count} selected`;
+    }
+
+    // Step 3: Convert
+    const convertBtn = document.getElementById('start-convert-btn');
+    if (convertBtn) {
+        convertBtn.addEventListener('click', async () => {
+            convertBtn.disabled = true;
+            convertBtn.innerText = 'Converting...';
+            const res = await fetch(`/actions/${actionId}/convert`, { method: 'POST' });
+            if (res.ok) {
+                alert('Conversion started! Check back in a few moments.');
+                setTimeout(() => location.reload(), 2000);
+            }
+        });
+    }
+
+    // Step 4: Load Videos
+    async function loadVideos() {
+        const res = await fetch(`/actions/${actionId}/items`);
+        const items = await res.json();
+        const list = document.getElementById('video-list');
+        list.innerHTML = '';
+
+        items.filter(i => i.type === 'video').forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'video-item glass-panel';
+            div.innerHTML = `
+                <video src="/storage/actions/${actionId}/videos/${item.path.split(/[\\/]/).pop()}" controls width="300"></video>
+                <div class="video-controls">
+                    <textarea placeholder="Voiceover text...">${item.metadata?.voiceover || ''}</textarea>
+                    <button class="btn btn-sm btn-secondary">Update Voiceover</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    // Step 5: Join
+    const joinBtn = document.getElementById('join-videos-btn');
+    if (joinBtn) {
+        joinBtn.addEventListener('click', async () => {
+            joinBtn.disabled = true;
+            joinBtn.innerText = 'Joining...';
+            const res = await fetch(`/actions/${actionId}/join`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                const player = document.getElementById('final-video-player');
+                const container = document.getElementById('final-video-container');
+                const download = document.getElementById('download-link');
+
+                player.src = data.videoPath;
+                download.href = data.videoPath;
+                container.classList.remove('hidden');
+                joinBtn.innerText = 'Join Again';
+                joinBtn.disabled = false;
+            } else {
+                alert('Error joining videos: ' + data.error);
+                joinBtn.disabled = false;
+            }
+        });
+    }
+</script>
+
+<style>
+    .steps-nav {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 1rem;
+    }
+
+    .step-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.1rem;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+    }
+
+    .step-btn.active {
+        color: var(--primary);
+        font-weight: bold;
+        border-bottom: 2px solid var(--primary);
+    }
+
+    .image-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .image-card {
+        position: relative;
+        aspect-ratio: 16/9;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .image-card:hover {
+        transform: scale(1.02);
+    }
+
+    .image-card.selected {
+        border-color: var(--primary);
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+    }
+
+    .image-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .center-content {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .video-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .video-item {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .video-controls textarea {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--glass-border);
+        color: white;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+</style>

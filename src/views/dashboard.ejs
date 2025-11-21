@@ -1,0 +1,85 @@
+<div class="dashboard-header">
+    <h1>Welcome, <%= typeof user !=='undefined' && user ? user.displayName : 'Guest' %>
+    </h1>
+    <button id="new-action-btn" class="btn btn-primary">+ New Action</button>
+</div>
+
+<div class="actions-grid">
+    <% if (typeof actions !=='undefined' && actions.length> 0) { %>
+        <% actions.forEach(action=> { %>
+            <div class="action-card glass-panel" onclick="window.location.href='/actions/<%= action.id %>'">
+                <div class="action-status status-<%= action.status %>">
+                    <%= action.status %>
+                </div>
+                <h3>
+                    <%= action.name %>
+                </h3>
+                <p class="action-url">
+                    <%= action.url %>
+                </p>
+                <div class="action-meta">
+                    <span>
+                        <%= new Date(action.createdAt).toLocaleDateString() %>
+                    </span>
+                </div>
+            </div>
+            <% }); %>
+                <% } else { %>
+                    <div class="empty-state">
+                        <p>No actions yet. Start creating amazing videos!</p>
+                    </div>
+                    <% } %>
+</div>
+
+<!-- New Action Modal -->
+<div id="new-action-modal" class="modal hidden">
+    <div class="modal-content glass-panel">
+        <h2>Start New Action</h2>
+        <form id="new-action-form" action="/actions" method="POST">
+            <div class="form-group">
+                <label for="name">Project Name</label>
+                <input type="text" id="name" name="name" required placeholder="My Awesome Video">
+            </div>
+            <div class="form-group">
+                <label for="url">Target URL</label>
+                <input type="url" id="url" name="url" required placeholder="https://example.com">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create & Scrape</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.getElementById('new-action-modal');
+        const btn = document.getElementById('new-action-btn');
+        const closeBtn = modal.querySelector('.btn-secondary');
+
+        if (btn && modal) {
+            btn.addEventListener('click', () => {
+                modal.classList.remove('hidden');
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+        }
+
+        // Close on click outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    });
+
+    function closeModal() {
+        const modal = document.getElementById('new-action-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+</script>
